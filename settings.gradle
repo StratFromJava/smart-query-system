@@ -1,0 +1,7 @@
+rootProject.name = 'smart-query-system'
+
+include 'sqs-common'
+include 'sqs-core'
+include 'sqs-ai'
+include 'sqs-security'
+include 'sqs-web'

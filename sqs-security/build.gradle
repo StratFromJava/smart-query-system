@@ -1,0 +1,12 @@
+dependencies {
+    api project(':sqs-core')
+
+    api 'org.springframework.boot:spring-boot-starter-security'
+    // 本模块含过滤器（Servlet API）与 @RestController（Web / Jackson），需 web starter 参与编译
+    api 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework:spring-tx'
+
+    implementation 'io.jsonwebtoken:jjwt-api'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson'
+}

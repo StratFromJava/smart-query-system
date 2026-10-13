@@ -1,0 +1,8 @@
+dependencies {
+    api project(':sqs-common')
+
+    api 'com.baomidou:mybatis-plus-spring-boot3-starter'
+    api 'org.springframework.boot:spring-boot-starter-validation'
+
+    runtimeOnly 'com.mysql:mysql-connector-j'
+}

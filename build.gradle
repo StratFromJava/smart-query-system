@@ -1,0 +1,73 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.springframework.boot:spring-boot-gradle-plugin:3.4.5'
+        classpath 'io.spring.gradle:dependency-management-plugin:1.1.7'
+    }
+}
+
+ext {
+    springBootVersion = '3.4.5'
+    springAiVersion = '1.0.0'
+    springAiAlibabaVersion = '1.0.0.2'
+    mybatisPlusVersion = '3.5.9'
+    jjwtVersion = '0.12.6'
+    hutoolVersion = '5.8.32'
+}
+
+allprojects {
+    group = 'com.example.sqs'
+    version = '1.0.0-SNAPSHOT'
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java-library'
+    apply plugin: 'io.spring.dependency-management'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.compilerArgs << '-parameters'
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+        systemProperty 'file.encoding', 'UTF-8'
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.boot:spring-boot-dependencies:${springBootVersion}"
+            mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+            mavenBom "com.alibaba.cloud.ai:spring-ai-alibaba-bom:${springAiAlibabaVersion}"
+        }
+        dependencies {
+            dependency "com.baomidou:mybatis-plus-spring-boot3-starter:${mybatisPlusVersion}"
+            dependency "cn.hutool:hutool-core:${hutoolVersion}"
+            dependency "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
+            dependency "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
+            dependency "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
+        }
+    }
+
+    dependencies {
+        compileOnly 'org.projectlombok:lombok'
+        annotationProcessor 'org.projectlombok:lombok'
+        testCompileOnly 'org.projectlombok:lombok'
+        testAnnotationProcessor 'org.projectlombok:lombok'
+
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    }
+}

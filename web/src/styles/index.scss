@@ -1,0 +1,226 @@
+@use './variables.scss' as v;
+@use './dark.scss';
+
+/* ============ 主题变量（浅色） ============ */
+:root {
+  --sqs-primary: #5b5bf7;
+  --sqs-primary-soft: #7b6bf2;
+  --sqs-primary-deep: #3d37d6;
+  --sqs-gradient: linear-gradient(135deg, #5b5bf7 0%, #7b6bf2 55%, #3d37d6 100%);
+  --sqs-gradient-soft: linear-gradient(135deg, rgba(91, 91, 247, 0.12) 0%, rgba(123, 107, 242, 0.06) 100%);
+
+  --sqs-bg: #ffffff;
+  --sqs-bg-subtle: #f5f6fa;
+  --sqs-bg-hover: rgba(91, 91, 247, 0.06);
+  --sqs-bg-active: rgba(91, 91, 247, 0.12);
+  --sqs-glass: rgba(255, 255, 255, 0.72);
+
+  --sqs-text: #1f2027;
+  --sqs-text-secondary: #5a5b68;
+  --sqs-text-muted: #9a9bab;
+
+  --sqs-border: rgba(31, 32, 39, 0.08);
+  --sqs-border-strong: rgba(31, 32, 39, 0.14);
+
+  --sqs-success: #17b26a;
+  --sqs-warning: #f5a623;
+  --sqs-danger: #e54545;
+
+  --sqs-shadow-sm: 0 1px 2px rgba(31, 32, 39, 0.05);
+  --sqs-shadow-md: 0 4px 16px rgba(31, 32, 39, 0.08);
+  --sqs-shadow-lg: 0 12px 32px rgba(31, 32, 39, 0.12);
+  --sqs-shadow-brand: 0 8px 24px rgba(91, 91, 247, 0.28);
+}
+
+/* ============ 基础重置 ============ */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--sqs-text);
+  background: var(--sqs-bg-subtle);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color v.$duration-base v.$ease-standard;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ============ 滚动条 ============ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sqs-border-strong);
+  border-radius: v.$radius-pill;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sqs-text-muted);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ============ 通用工具类 ============ */
+.sqs-gradient-text {
+  background: var(--sqs-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sqs-glass {
+  background: var(--sqs-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.sqs-card {
+  background: var(--sqs-bg);
+  border: 1px solid var(--sqs-border);
+  border-radius: v.$radius-lg;
+  box-shadow: var(--sqs-shadow-sm);
+}
+
+/* 消息入场动效 */
+.fade-slide-enter-active {
+  transition: all v.$duration-base v.$ease-standard;
+}
+
+.fade-slide-leave-active {
+  transition: all v.$duration-fast v.$ease-standard;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* 打字机光标 */
+.sqs-caret::after {
+  content: '▋';
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--sqs-primary);
+  animation: sqs-blink 1s steps(2, start) infinite;
+}
+
+@keyframes sqs-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* 三点呼吸动画（等待模型响应） */
+.sqs-typing {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.sqs-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sqs-primary-soft);
+  animation: sqs-breath 1.2s infinite ease-in-out;
+}
+
+.sqs-typing span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.sqs-typing span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes sqs-breath {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ============ 覆盖 Element Plus 部分默认风格 ============ */
+.el-button--primary {
+  --el-button-bg-color: var(--sqs-primary);
+  --el-button-border-color: var(--sqs-primary);
+  --el-button-hover-bg-color: var(--sqs-primary-soft);
+  --el-button-hover-border-color: var(--sqs-primary-soft);
+  --el-button-active-bg-color: var(--sqs-primary-deep);
+  --el-button-active-border-color: var(--sqs-primary-deep);
+}
+
+.el-message {
+  border-radius: v.$radius-md;
+}
+
+/* Markdown 正文 */
+.markdown-body {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--sqs-text);
+  background: transparent;
+}
+
+.markdown-body pre.hljs {
+  border-radius: v.$radius-md;
+  padding: 14px 16px;
+  overflow-x: auto;
+  background: var(--sqs-bg-subtle);
+  border: 1px solid var(--sqs-border);
+}
+
+.markdown-body code {
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+}
+
+.markdown-body p {
+  margin: 0 0 12px;
+}
+
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}

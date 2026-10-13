@@ -1,0 +1,72 @@
+/* ============ 深色主题变量覆盖 ============ */
+html.dark {
+  --sqs-bg: #16171c;
+  --sqs-bg-subtle: #1d1e24;
+  --sqs-bg-hover: rgba(123, 107, 242, 0.1);
+  --sqs-bg-active: rgba(123, 107, 242, 0.18);
+  --sqs-glass: rgba(29, 30, 36, 0.78);
+
+  --sqs-text: #e8e9ef;
+  --sqs-text-secondary: #a4a5b0;
+  --sqs-text-muted: #71727e;
+
+  --sqs-border: rgba(232, 233, 239, 0.1);
+  --sqs-border-strong: rgba(232, 233, 239, 0.18);
+
+  --sqs-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --sqs-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --sqs-shadow-brand: 0 8px 24px rgba(91, 91, 247, 0.36);
+
+  color-scheme: dark;
+}
+
+/* 深色下 Markdown 代码块与引用配色 */
+html.dark .markdown-body pre.hljs {
+  background: #101116;
+  border-color: var(--sqs-border);
+}
+
+html.dark .markdown-body blockquote {
+  color: var(--sqs-text-secondary);
+  border-left-color: var(--sqs-primary-soft);
+}
+
+html.dark .markdown-body table tr {
+  background-color: transparent;
+}
+
+html.dark .markdown-body table tr:nth-child(2n) {
+  background-color: rgba(232, 233, 239, 0.04);
+}
+
+/* 深色下 highlight.js github 主题反色 */
+html.dark .hljs {
+  color: #e8e9ef;
+  background: #101116;
+}
+
+html.dark .hljs-comment,
+html.dark .hljs-quote {
+  color: #71727e;
+}
+
+html.dark .hljs-keyword,
+html.dark .hljs-selector-tag,
+html.dark .hljs-type {
+  color: #a78bfa;
+}
+
+html.dark .hljs-string,
+html.dark .hljs-attr {
+  color: #7ee2b8;
+}
+
+html.dark .hljs-number,
+html.dark .hljs-literal {
+  color: #f5a623;
+}
+
+html.dark .hljs-title,
+html.dark .hljs-section {
+  color: #7b6bf2;
+}

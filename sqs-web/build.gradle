@@ -1,0 +1,18 @@
+apply plugin: 'org.springframework.boot'
+
+dependencies {
+    implementation project(':sqs-ai')
+    implementation project(':sqs-security')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+}
+
+bootJar {
+    enabled = true
+    archiveFileName = 'smart-query-system.jar'
+}
+
+jar {
+    enabled = false
+}

@@ -1,0 +1,8 @@
+dependencies {
+    api project(':sqs-core')
+
+    api 'com.alibaba.cloud.ai:spring-ai-alibaba-starter-dashscope'
+
+    // RAG 预留：Spring AI 内存向量库（后续可替换为 Milvus / PGVector / AnalyticDB）
+    implementation 'org.springframework.ai:spring-ai-vector-store'
+}

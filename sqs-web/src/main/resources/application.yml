@@ -1,0 +1,79 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: smart-query-system
+  profiles:
+    active: dev
+  # ---------------- 数据源 ----------------
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:smart_query}
+      ?useUnicode=true&characterEncoding=utf8&useSSL=false
+      &serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+  # ---------------- Spring AI Alibaba / DashScope ----------------
+  ai:
+    dashscope:
+      api-key: ${AI_DASHSCOPE_API_KEY:}
+
+# ---------------- 业务配置 ----------------
+sqs:
+  security:
+    jwt:
+      # 生产环境务必通过环境变量 SQS_JWT_SECRET 覆盖（长度需 >= 32 字节）
+      secret: ${SQS_JWT_SECRET:smart-query-system-dev-jwt-secret-please-replace-me}
+      expiration-hours: 12
+  ai:
+    default-model: qwen-plus
+    temperature: 0.7
+    history-limit: 20
+    system-prompt: |
+      你是 SmartQuery 智能助手，一个专业、简洁、友好的中文 AI 助手。
+      回答请使用 Markdown 排版：长内容分条陈述，代码放入带语言标注的代码块。
+      不确定时应明确说明不确定，不要编造事实。
+    models:
+      - code: qwen-plus
+        label: 通义千问 Plus
+        multimodal: false
+      - code: qwen-max
+        label: 通义千问 Max
+        multimodal: false
+      - code: qwen-turbo
+        label: 通义千问 Turbo
+        multimodal: false
+    rag:
+      enabled: false
+      top-k: 4
+    web-search:
+      enabled: false
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    com.example.sqs: info
+    org.springframework.ai: warn
