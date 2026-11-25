@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
 import SessionList from './SessionList.vue'
 
@@ -11,7 +12,13 @@ const props = defineProps({
 
 const emit = defineEmits(['new-chat', 'select', 'rename', 'remove', 'search'])
 
+const route = useRoute()
 const keyword = ref('')
+
+const navItems = [
+  { path: '/chat', label: '对话', icon: 'ChatDotRound' },
+  { path: '/knowledge', label: '知识库', icon: 'Collection' }
+]
 
 function handleSearch() {
   emit('search', keyword.value)
@@ -26,6 +33,19 @@ function handleSearch() {
         <span v-if="!collapsed">新建对话</span>
       </button>
     </div>
+
+    <nav v-if="!collapsed" class="sidebar__nav">
+      <RouterLink
+        v-for="item in navItems"
+        :key="item.path"
+        :to="item.path"
+        class="sidebar__nav-item"
+        :class="{ 'sidebar__nav-item--active': route.path.startsWith(item.path) }"
+      >
+        <el-icon><component :is="item.icon" /></el-icon>
+        <span>{{ item.label }}</span>
+      </RouterLink>
+    </nav>
 
     <div v-if="!collapsed" class="sidebar__search">
       <el-input
@@ -80,6 +100,37 @@ function handleSearch() {
 
   &__search {
     padding: 0 4px 10px;
+  }
+
+  &__nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 4px 10px;
+  }
+
+  &__nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: v.$radius-md;
+    color: var(--sqs-text-secondary);
+    font-size: 13px;
+    text-decoration: none;
+    transition: all v.$duration-fast v.$ease-standard;
+
+    &:hover {
+      background: var(--sqs-bg-subtle);
+      color: var(--sqs-text);
+    }
+
+    &--active {
+      background: var(--sqs-gradient-soft);
+      color: var(--sqs-primary);
+      font-weight: 500;
+    }
   }
 
   &__footer {

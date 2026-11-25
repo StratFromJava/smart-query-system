@@ -22,20 +22,19 @@ const routes = [
   {
     path: '/knowledge',
     name: 'knowledge',
-    component: () => import('@/views/PlaceholderView.vue'),
-    props: { title: '知识库', desc: '上传文档构建专属知识库，让回答基于你的私有资料。' }
+    component: () => import('@/views/KnowledgeView.vue')
   },
   {
     path: '/search',
     name: 'search',
     component: () => import('@/views/PlaceholderView.vue'),
-    props: { title: '联网搜索', desc: '实时检索互联网信息，让回答具备最新时效性。' }
+    props: { title: '联网搜索', desc: '联网检索能力已上线：在对话输入区的工具栏开启「联网搜索」开关即可。' }
   },
   {
     path: '/files',
     name: 'files',
     component: () => import('@/views/PlaceholderView.vue'),
-    props: { title: '文件与图片理解', desc: '上传图片或文档，让模型看懂内容并给出分析。' }
+    props: { title: '图片理解', desc: '图片理解已上线：切换到「通义千问 VL」模型，在输入区上传图片即可。' }
   },
   { path: '/', redirect: '/chat' },
   { path: '/:pathMatch(.*)*', redirect: '/chat' }

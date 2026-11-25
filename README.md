@@ -2,7 +2,7 @@
 
 基于 **Spring Boot 3 + AgentScope-Java（通义千问）** 与 **Vue 3 + Element Plus** 构建的前后端分离智能对话系统。
 
-参照通义千问的交互体验：SSE 流式打字机输出、Markdown 富文本渲染、会话云端留存与多模型切换；后端采用 Gradle 多模块分层，并通过 Spring Security + JWT 完成用户注册登录与数据隔离；数据层使用 **SQLite 内嵌本地文件库**（零外部依赖，启动自动建表），同时为知识库 RAG、联网搜索、文件/图片理解三类扩展能力预留了完整接入点。
+参照通义千问的交互体验：SSE 流式打字机输出、Markdown 富文本渲染、会话云端留存与多模型切换；后端采用 Gradle 多模块分层，并通过 Spring Security + JWT 完成用户注册登录与数据隔离；数据层使用 **SQLite 内嵌本地文件库**（零外部依赖，启动自动建表）。已实现 **知识库 RAG**（本地轻量向量检索）、**联网搜索**（百炼联网插件）与**图片理解**（qwen-vl 视觉模型）三类扩展能力。
 
 ---
 
@@ -21,15 +21,15 @@
 | 数据隔离 | 会话与消息均绑定 `user_id`，越权访问统一返回 404 |
 | 主题切换 | 浅色 / 深色主题，Element Plus 与自定义样式同步切换 |
 
-### 预留（接入点已就绪，默认关闭）
+### 扩展能力（已实现）
 
-| 能力 | 状态 | 说明 |
-| --- | --- | --- |
-| 知识库 RAG | 预留 | 开启后自动检索向量库并注入 System Prompt，默认内存 `SimpleVectorStore` |
-| 联网搜索 | 预留 | `@Tool` 工具已定义，接入真实搜索服务即可被模型调用 |
-| 文件/图片理解 | 预留 | 多模态消息构造入口已就绪，需配合 `qwen-vl-max` 等视觉模型 |
+| 能力 | 说明 |
+| --- | --- |
+| 知识库 RAG | 上传 txt/md/pdf 自动分块 + DashScope text-embedding 向量化，本地余弦检索 topK 注入 System Prompt，按用户隔离 |
+| 联网搜索 | DashScope 百炼联网搜索插件（`enable_search`），复用现有 API Key，模型侧自动决定何时检索 |
+| 图片理解 | 上传图片存本地，以 DataBlock（base64）构造多模态消息，配合 `qwen-vl-max` 视觉模型 |
 
-前端对未实现的能力统一展示「即将开放」，不影响主链路使用。
+前端能力开关在输入区工具栏，图片按钮在多模态模型下可用。
 
 ---
 
@@ -152,12 +152,11 @@ smart-query-system/
 ├── sqs-ai/                         # AI 层：AgentScope Agent 编排与扩展能力
 │   └── .../ai/
 │       ├── config/          AgentConfig · AgentFactory  全局 Toolkit 与请求级 ReActAgent 工厂
-│       ├── service/         ChatService            流式/非流式对话编排（含历史上下文构建）
+│       ├── service/         ChatService            流式/非流式对话编排（含历史与图片上下文构建）
 │       ├── model/           ModelRegistry          模型清单与合法性校验
 │       ├── properties/      AiProperties           sqs.ai.* 配置绑定
-│       ├── rag/             RagService             知识库检索（占位，待接入向量库）
-│       ├── tool/            WebSearchTool          AgentScope @Tool 联网搜索
-│       └── multimodal/      MultimodalService      多模态接入点
+│       ├── rag/             EmbeddingClient · TextChunker · DocumentTextExtractor · KnowledgeIngestService · RagService
+│       └── multimodal/      MultimodalService      图片 Markdown 持久化解析 + DataBlock 构造
 │
 ├── sqs-security/                   # 安全层：鉴权与账号
 │   └── .../security/
@@ -245,7 +244,7 @@ mkdir data   # SQLite 数据文件将生成在 ./data/smart-query.db
 ```
 
 应用启动时自动执行 `sqs-web/src/main/resources/sql/schema-sqlite.sql`（幂等 DDL），创建
-`sys_user`、`chat_session`、`chat_message` 三张表并预置账号：
+`sys_user`、`chat_session`、`chat_message`、`knowledge_document`、`knowledge_chunk` 五张表并预置账号：
 
 | 用户名 | 密码 |
 | --- | --- |
@@ -311,10 +310,16 @@ npm run dev
 | `sqs.ai.system-prompt` | 内置中文提示词 | 系统人设与输出格式约束 |
 | `sqs.ai.models[].code` | qwen-plus / qwen-max / qwen-turbo | 模型清单，增删即生效（前端下拉自动同步） |
 | `sqs.ai.models[].label` | 中文名 | 前端展示名 |
-| `sqs.ai.models[].multimodal` | `false` | 是否支持多模态输入 |
-| `sqs.ai.rag.enabled` | `false` | 知识库 RAG 总开关 |
+| `sqs.ai.models[].multimodal` | `false` | 是否支持多模态输入（`qwen-vl-max` 为 `true`） |
+| `sqs.ai.rag.enabled` | `true` | 知识库 RAG 总开关 |
 | `sqs.ai.rag.top-k` | `4` | 向量检索返回条数 |
-| `sqs.ai.web-search.enabled` | `false` | 联网搜索工具开关 |
+| `sqs.ai.rag.chunk-size` / `overlap` | `600` / `80` | 文档分块目标长度与相邻块重叠字符数 |
+| `sqs.ai.rag.scan-limit` | `2000` | 检索时最多参与相似度计算的分块数 |
+| `sqs.ai.embedding.base-url` / `model` | DashScope 兼容端点 / `text-embedding-v4` | 向量化接口与模型 |
+| `sqs.ai.embedding.dimensions` / `batch-size` | `1024` / `10` | 向量维度与单次请求条数上限 |
+| `sqs.ai.web-search.enabled` | `true` | 联网搜索总开关（DashScope 百炼联网插件） |
+| `sqs.upload.dir` | `./data/uploads` | 图片上传存储目录（`/uploads/**` 映射到此） |
+| `spring.servlet.multipart.max-file-size` | `20MB` | 单文件大小上限 |
 
 示例：新增一个模型只需在 yml 中追加一项，无需改代码：
 
@@ -396,6 +401,30 @@ sqs:
 | `create_time` | DATETIME | 创建时间 |
 | `deleted` | TINYINT | 逻辑删除 |
 
+### `knowledge_document` 知识库文档表
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | BIGINT PK | 主键 |
+| `user_id` | BIGINT | 所属用户（知识库按用户隔离） |
+| `title` | VARCHAR(255) | 展示标题（取文件名去扩展名） |
+| `file_name` / `file_type` / `file_size` | TEXT / TEXT / BIGINT | 原始文件信息（txt / md / pdf） |
+| `chunk_count` | INT | 分块数量 |
+| `status` | TEXT | READY / PROCESSING / FAILED |
+| `create_time` / `deleted` | — | 同上 |
+
+### `knowledge_chunk` 知识库分块表
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | BIGINT PK | 主键 |
+| `document_id` | BIGINT | 所属文档，索引 `idx_kchunk_doc` |
+| `user_id` | BIGINT | 所属用户（检索隔离），索引 `idx_kchunk_user` |
+| `seq` | INT | 块序号 |
+| `content` | TEXT | 分块文本 |
+| `embedding` | TEXT | 向量（JSON 浮点数组） |
+| `create_time` / `deleted` | — | 同上 |
+
 ---
 
 ## 十、接口文档
@@ -463,9 +492,19 @@ sqs:
 
 - `sessionId` 为空时后端自动创建新会话
 - `model` 为空或非法时回退到 `sqs.ai.default-model`
-- `features` 取值见 `FeatureType.code`：`multi_model` / `rag` / `web_search` / `multimodal`
+- `features` 取值见 `FeatureType.code`：`rag`（检索知识库注入上下文）/ `web_search`（开启百炼联网插件）
+- `attachments`：图片 `/uploads/**` 相对地址列表，需配合多模态模型（`qwen-vl-max`）；图片以 Markdown 语法随消息持久化，历史上下文中自动还原
 
-### 10.5 元数据接口
+### 10.5 文件与知识库接口（需 Token）
+
+| 方法 | 路径 | 请求 | 说明 |
+| --- | --- | --- | --- |
+| POST | `/api/upload` | `multipart/form-data`，字段 `file` | 上传图片，返回 `{url}`（`/uploads/**` 可直接访问） |
+| POST | `/api/knowledge/documents` | `multipart/form-data`，字段 `file` | 上传 txt/md/pdf，自动分块向量化入库 |
+| GET | `/api/knowledge/documents` | — | 当前用户文档列表（含分块数与状态） |
+| DELETE | `/api/knowledge/documents/{id}` | — | 删除文档及其全部分块 |
+
+### 10.6 元数据接口
 
 | 方法 | 路径 | 鉴权 | 说明 |
 | --- | --- | --- | --- |
@@ -473,7 +512,7 @@ sqs:
 | GET | `/api/models/default` | 需 Token | 默认模型 code |
 | GET | `/api/features` | **公开** | 能力清单 `[{code,name,desc,implemented}]`，驱动前端开关显隐 |
 
-### 10.6 SSE 协议
+### 10.7 SSE 协议
 
 `POST /api/chat/stream` 返回 `text/event-stream`，每帧一个 JSON 对象：
 
@@ -494,9 +533,9 @@ data: {"type":"done"}
 
 未登录或参数校验失败时，由 Spring Security / 全局异常处理器返回统一响应体 JSON（HTTP 200 + `code` 非 200），前端会识别并提示。
 
-### 10.7 鉴权说明
+### 10.8 鉴权说明
 
-放行（无需 Token）：`/api/auth/login`、`/api/auth/register`、`/api/features`、`/actuator/health`、`/actuator/info`。
+放行（无需 Token）：`/api/auth/login`、`/api/auth/register`、`/api/features`、`/uploads/**`、`/actuator/health`、`/actuator/info`。
 
 其余 `/api/**` 均需携带：
 
@@ -508,40 +547,32 @@ Token 由 `SecurityUtils.currentUserId()` 解析后注入业务层，所有会�
 
 ---
 
-## 十一、预留能力接入指南
+## 十一、扩展能力实现说明
 
-### 知识库 RAG
+### 知识库 RAG（本地轻量实现）
 
-1. 开启开关：
+链路：文档上传（txt/md 直读，PDF 用 PDFBox 提取）→ 段落分块（目标 600 字符、重叠 80）→
+DashScope `text-embedding-v4` 向量化（OpenAI 兼容接口，分批 ≤10 条）→ 分块与向量（JSON）存
+SQLite → 检索时问题向量化、与用户分块做余弦相似度取 topK 注入 System Prompt。
 
-   ```yaml
-   sqs:
-     ai:
-       rag:
-         enabled: true
-         top-k: 4
-   ```
+- 向量检索按 `userId` 隔离；入库失败整体回滚，不留脏数据。
+- 当前为**本地轻量实现**（内存余弦计算，适合个人/小团队规模）；数据量增大后可平滑切换
+   Milvus / PGVector——只需替换 `RagService` 的检索实现，编排层不变。
+- 使用方式：知识库管理页上传文档；对话时在输入区工具栏开启「知识库问答」开关。
 
-2. 当前 `RagService` 为占位实现（返回空串）。接入真实检索时，实现向量检索并返回资料片段即可——
-   可选用 AgentScope Knowledge / Milvus / PGVector / AnalyticDB 等。
+### 联网搜索（百炼联网插件）
 
-3. 请求携带 `features: ["rag"]` 时，`ChatService` 会自动把检索结果拼进 System Prompt（拼装逻辑已就绪）。
+- 开启方式：对话输入区工具栏开启「联网搜索」开关（总开关 `sqs.ai.web-search.enabled`）。
+- 实现：请求开启 `enable_search` 参数，由 DashScope 侧完成联网检索并把结果融入回答，
+  复用现有 API Key，无需第三方搜索服务。后续如需自主可控的检索（如接 IQS / Tavily），
+  在 `Toolkit` 注册自定义 `@Tool` 即可。
 
-### 联网搜索
+### 图片理解（qwen-vl）
 
-1. 开启开关：`sqs.ai.web-search.enabled=true`
-2. `WebSearchTool`（AgentScope `@Tool` 标注）自动注册为 Bean，由 `AgentConfig` 挂载到全局 `Toolkit`，即可被模型自主调用。
-3. 替换 `WebSearchTool#search` 的实现接入真实搜索服务（如阿里 IQS、Serper、Bing API）。
-
-### 文件 / 图片理解
-
-1. `MultimodalService` 提供校验与消息构造入口。
-2. 在 yml 中注册支持视觉的模型（如 `qwen-vl-max`）并标记 `multimodal: true`。
-3. 构造带 `Media` 的 `UserMessage`：
-
-   ```java
-   new UserMessage(text, List.of(new Media(MimeTypeUtils.IMAGE_PNG, url)))
-   ```
+1. 前端切换到「通义千问 VL Max」模型（`multimodal: true`），输入区出现图片上传按钮。
+2. 图片经 `POST /api/upload` 存入 `sqs.upload.dir`，以 `/uploads/**` 提供访问。
+3. 发送时 `ChatService` 把消息中的图片（Markdown 语法持久化）解析为
+   AgentScope `DataBlock`（base64），随 `TextBlock` 一起传给视觉模型；非多模态模型下自动降级为纯文本。
 
 ### 多模型切换
 
@@ -562,6 +593,10 @@ $env:JAVA_HOME = 'C:\Program Files\Java\jdk-21'
 **Q2：对话报 `DashScope API key must be set`？**
 
 未注入 `AI_DASHSCOPE_API_KEY`。该 Key 在首次构建 Agent（发起对话）时校验，属必填项，即使是本地冒烟测试也需填一个占位值。
+
+**Q2.1：上传知识库文档报「文档向量化失败」？**
+
+同 Q2：向量化依赖 `AI_DASHSCOPE_API_KEY`（text-embedding-v4），配置真实 Key 后重传即可；失败不会留下脏数据。
 
 **Q3：启动报 JWT 密钥长度不足 32 字节？**
 
@@ -656,9 +691,7 @@ location / {
 
 ## 十五、后续规划
 
-- [ ] 知识库 RAG 完整链路（文档上传、切片、向量化、按用户隔离知识库）
-- [ ] 联网搜索接入真实搜索服务
-- [ ] 多模态文件上传与图片理解
+- [ ] 向量库升级（Milvus / PGVector）与知识库增强（分块策略调优、混合检索、引用溯源）
 - [ ] Token 消耗统计与用量配额
 - [ ] 消息重试 / 重新生成（前端入口已预留）
 - [ ] 流式响应中断后的断点续传

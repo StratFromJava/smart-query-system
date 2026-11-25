@@ -4,4 +4,10 @@ dependencies {
     // AgentScope-Java：核心 Agent 框架 + DashScope（通义千问）模型扩展
     api 'io.agentscope:agentscope-core'
     api 'io.agentscope:agentscope-extensions-model-dashscope'
+
+    // 文件上传（MultipartFile）与 Embedding HTTP 客户端（RestClient）
+    api 'org.springframework:spring-web'
+
+    // RAG：PDF 文档文本提取
+    implementation 'org.apache.pdfbox:pdfbox:3.0.3'
 }

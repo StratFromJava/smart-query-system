@@ -22,6 +22,11 @@ spring:
     init:
       mode: always
       schema-locations: classpath:sql/schema-sqlite.sql
+  # ---------------- 文件上传 ----------------
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 50MB
 # ---------------- 业务配置 ----------------
 sqs:
   security:
@@ -49,11 +54,25 @@ sqs:
       - code: qwen-turbo
         label: 通义千问 Turbo
         multimodal: false
+      - code: qwen-vl-max
+        label: 通义千问 VL Max（图片理解）
+        multimodal: true
     rag:
-      enabled: false
+      enabled: true
       top-k: 4
+      chunk-size: 600
+      overlap: 80
+      scan-limit: 2000
     web-search:
-      enabled: false
+      enabled: true
+    embedding:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      model: text-embedding-v4
+      dimensions: 1024
+      batch-size: 10
+  upload:
+    # 上传文件存储目录（/uploads/** 映射到此）
+    dir: ${SQS_UPLOAD_DIR:./data/uploads}
 
 mybatis-plus:
   configuration:

@@ -3,6 +3,7 @@ package com.example.sqs.core.vo;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -22,4 +23,7 @@ public class ChatRequest {
 
     /** 启用的预留能力，见 FeatureType.code。 */
     private Set<String> features;
+
+    /** 图片附件地址（/uploads/** 相对路径），需配合多模态模型使用。 */
+    private List<String> attachments;
 }

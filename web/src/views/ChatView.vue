@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ChatHeader from '@/components/layout/ChatHeader.vue'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
@@ -19,6 +19,11 @@ const chatStore = useChatStore()
 const inputRef = ref()
 const messageListRef = ref()
 
+/** 输入区可开关的能力（仅已实现且非多模态的能力；图片走上传按钮） */
+const availableFeatures = computed(() =>
+  appStore.features.filter((f) => f.implemented && f.code !== 'multimodal')
+)
+
 /** 路由中的会话 ID 变化 → 重新加载历史消息 */
 watch(
   () => route.params.sessionId,
@@ -35,8 +40,8 @@ onMounted(async () => {
   await sessionStore.refresh()
 })
 
-async function handleSend(content) {
-  await chatStore.send(content, appStore.currentModel)
+async function handleSend(content, extras) {
+  await chatStore.send(content, appStore.currentModel, extras || {})
   // 首次发言会自动创建会话，同步到地址栏
   if (sessionStore.currentId && Number(route.params.sessionId) !== sessionStore.currentId) {
     router.replace(`/chat/${sessionStore.currentId}`)
@@ -111,8 +116,12 @@ function handleRegenerate(index) {
         <ChatInput
           ref="inputRef"
           :streaming="chatStore.streaming"
+          :features="availableFeatures"
+          :active-features="appStore.activeFeatures"
+          :multimodal="appStore.isMultimodalModel"
           @send="handleSend"
           @stop="chatStore.stop"
+          @toggle-feature="appStore.toggleFeature"
         />
       </main>
     </div>

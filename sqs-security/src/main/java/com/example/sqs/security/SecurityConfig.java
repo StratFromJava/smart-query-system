@@ -29,6 +29,7 @@ public class SecurityConfig {
             "/api/auth/login",
             "/api/auth/register",
             "/api/features",
+            "/uploads/**",
             "/actuator/health",
             "/actuator/info"
     };

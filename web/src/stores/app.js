@@ -10,12 +10,17 @@ export const useAppStore = defineStore('app', {
     featurePanelVisible: false,
     models: [],
     features: [],
+    activeFeatures: [],
     defaultModel: 'qwen-plus',
     currentModel: 'qwen-plus'
   }),
   getters: {
     isDark: (state) => state.theme === 'dark',
-    modelOptions: (state) => state.models.map((m) => ({ value: m.code, label: m.label }))
+    modelOptions: (state) => state.models.map((m) => ({ value: m.code, label: m.label })),
+    currentModelDef: (state) => state.models.find((m) => m.code === state.currentModel) || null,
+    isMultimodalModel() {
+      return !!this.currentModelDef?.multimodal
+    }
   },
   actions: {
     initTheme() {
@@ -31,6 +36,15 @@ export const useAppStore = defineStore('app', {
     },
     setFeaturePanel(visible) {
       this.featurePanelVisible = visible
+    },
+    /** 切换对话能力开关（rag / web_search），切换模型时校验剔除不适用的开关 */
+    toggleFeature(code) {
+      const index = this.activeFeatures.indexOf(code)
+      if (index >= 0) {
+        this.activeFeatures.splice(index, 1)
+      } else {
+        this.activeFeatures.push(code)
+      }
     },
     async loadMeta() {
       try {

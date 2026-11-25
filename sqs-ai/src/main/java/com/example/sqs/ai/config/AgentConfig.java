@@ -1,9 +1,7 @@
 package com.example.sqs.ai.config;
 
 import com.example.sqs.ai.properties.AiProperties;
-import com.example.sqs.ai.tool.WebSearchTool;
 import io.agentscope.core.tool.Toolkit;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,16 +17,11 @@ import org.springframework.context.annotation.Configuration;
 public class AgentConfig {
 
     /**
-     * 全局工具集。开启 sqs.ai.web-search.enabled=true 时注册联网搜索工具，
-     * 供所有 Agent 实例共享。
+     * 全局工具集，供所有 Agent 实例共享（联网搜索走 DashScope 联网插件，
+     * 无需工具；后续自定义工具在此注册）。
      */
     @Bean
-    public Toolkit toolkit(ObjectProvider<WebSearchTool> webSearchToolProvider) {
-        Toolkit toolkit = new Toolkit();
-        WebSearchTool webSearchTool = webSearchToolProvider.getIfAvailable();
-        if (webSearchTool != null) {
-            toolkit.registerTool(webSearchTool);
-        }
-        return toolkit;
+    public Toolkit toolkit() {
+        return new Toolkit();
     }
 }

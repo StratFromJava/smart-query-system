@@ -59,3 +59,38 @@ CREATE TABLE IF NOT EXISTS chat_message (
 
 CREATE INDEX IF NOT EXISTS idx_message_session_create ON chat_message (session_id, create_time);
 CREATE INDEX IF NOT EXISTS idx_message_user_session ON chat_message (user_id, session_id);
+
+-- -----------------------------------------------------------------------------
+-- 知识库文档表（RAG）
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS knowledge_document (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    title       TEXT    NOT NULL,
+    file_name   TEXT,
+    file_type   TEXT,
+    file_size   INTEGER,
+    chunk_count INTEGER NOT NULL DEFAULT 0,
+    status      TEXT    NOT NULL DEFAULT 'READY',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted     INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_kdoc_user_create ON knowledge_document (user_id, create_time);
+
+-- -----------------------------------------------------------------------------
+-- 知识库分块表（embedding 为 JSON 浮点数组文本）
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS knowledge_chunk (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    user_id     INTEGER NOT NULL,
+    seq         INTEGER NOT NULL,
+    content     TEXT    NOT NULL,
+    embedding   TEXT,
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted     INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_kchunk_doc ON knowledge_chunk (document_id);
+CREATE INDEX IF NOT EXISTS idx_kchunk_user ON knowledge_chunk (user_id);

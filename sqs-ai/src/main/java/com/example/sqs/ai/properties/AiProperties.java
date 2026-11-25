@@ -43,6 +43,8 @@ public class AiProperties {
 
     private WebSearch webSearch = new WebSearch();
 
+    private Embedding embedding = new Embedding();
+
     /** 单个模型定义。 */
     @Data
     public static class ModelDef {
@@ -64,16 +66,32 @@ public class AiProperties {
         }
     }
 
-    /** 知识库（RAG）预留配置，默认关闭。 */
+    /** 知识库（RAG）配置。 */
     @Data
     public static class Rag {
-        private boolean enabled = false;
+        private boolean enabled = true;
         private int topK = 4;
+        /** 文档分块目标长度（字符）。 */
+        private int chunkSize = 600;
+        /** 相邻分块重叠长度（字符）。 */
+        private int overlap = 80;
+        /** 检索时最多参与相似度计算的分块数。 */
+        private int scanLimit = 2000;
     }
 
-    /** 联网搜索预留配置，默认关闭。 */
+    /** 联网搜索（DashScope 百炼联网插件）配置。 */
     @Data
     public static class WebSearch {
-        private boolean enabled = false;
+        private boolean enabled = true;
+    }
+
+    /** 向量化（Embedding）配置。 */
+    @Data
+    public static class Embedding {
+        private String baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+        private String model = "text-embedding-v4";
+        private int dimensions = 1024;
+        /** 单次请求最多向量化文本条数。 */
+        private int batchSize = 10;
     }
 }

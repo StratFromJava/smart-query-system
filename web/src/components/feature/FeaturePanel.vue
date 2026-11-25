@@ -18,19 +18,26 @@ function handleOpen(code) {
   appStore.setFeaturePanel(false)
   router.push(path)
 }
+
+/** 是否可跳转：知识库有管理页，其余能力在对话内直接使用 */
+function isNavigable(feature) {
+  return feature.code === 'rag'
+}
 </script>
 
 <template>
   <el-drawer v-model="appStore.featurePanelVisible" title="扩展能力" size="380px">
     <div class="feature-panel">
-      <p class="feature-panel__intro">以下为规划中的扩展能力，已预留后端接入点与前端入口。</p>
+      <p class="feature-panel__intro">
+        已上线能力：联网搜索与图片理解可在对话中直接使用，知识库请前往管理页上传文档。
+      </p>
 
       <div
         v-for="feature in appStore.features"
         :key="feature.code"
         class="feature-card"
         :class="{ 'feature-card--ready': feature.implemented }"
-        @click="handleOpen(feature.code)"
+        @click="isNavigable(feature) && handleOpen(feature.code)"
       >
         <div class="feature-card__icon">
           <el-icon><component :is="feature.code === 'rag' ? 'Document' : feature.code === 'web_search' ? 'Link' : 'Picture'" /></el-icon>

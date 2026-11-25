@@ -30,16 +30,22 @@ public class AgentFactory {
      *
      * @param modelCode    模型名（如 qwen-plus）
      * @param systemPrompt 本次请求使用的系统提示词（含可选 RAG 注入）
+     * @param webSearch    是否启用 DashScope 联网搜索插件
      */
-    public ReActAgent create(String modelCode, String systemPrompt) {
+    public ReActAgent create(String modelCode, String systemPrompt, boolean webSearch) {
+        GenerateOptions.Builder options = GenerateOptions.builder()
+                .temperature(aiProperties.getTemperature());
+        if (webSearch && aiProperties.getWebSearch().isEnabled()) {
+            // DashScope 百炼联网搜索插件：参数合并进请求 parameters
+            options.additionalBodyParam("enable_search", true);
+        }
+
         DashScopeChatModel model = DashScopeChatModel.builder()
                 .apiKey(apiKey())
                 .modelName(modelCode)
                 .stream(true)
                 .formatter(new DashScopeChatFormatter())
-                .defaultOptions(GenerateOptions.builder()
-                        .temperature(aiProperties.getTemperature())
-                        .build())
+                .defaultOptions(options.build())
                 .build();
 
         return ReActAgent.builder()

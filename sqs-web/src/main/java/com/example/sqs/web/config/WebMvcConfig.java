@@ -1,17 +1,20 @@
 package com.example.sqs.web.config;
 
+import com.example.sqs.core.config.UploadProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.List;
 
 /**
- * CORS 配置。开发环境前端 Vite 默认走代理，此处作为直连兜底。
+ * CORS 配置。开发环境前端 Vite 默认走代理，此处作为直连兜底；
+ * 同时把 /uploads/** 映射到本地上传目录。
  */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
@@ -21,6 +24,22 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "http://127.0.0.1:5173",
             "http://localhost:5174"
     };
+
+    private final UploadProperties uploadProperties;
+
+    public WebMvcConfig(UploadProperties uploadProperties) {
+        this.uploadProperties = uploadProperties;
+    }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        String dir = uploadProperties.getDir();
+        if (dir.endsWith("/") || dir.endsWith("\\")) {
+            dir = dir.substring(0, dir.length() - 1);
+        }
+        registry.addResourceHandler("/uploads/**")
+                .addResourceLocations("file:" + dir + "/");
+    }
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {

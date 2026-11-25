@@ -19,6 +19,11 @@ export default defineConfig({
         changeOrigin: true,
         // SSE 长连接：关闭压缩与缓冲，保证流式分片实时到达
         compress: false
+      },
+      // 上传文件的静态访问
+      '/uploads': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
       }
     }
   },

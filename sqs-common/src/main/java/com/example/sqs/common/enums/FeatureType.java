@@ -12,10 +12,10 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum FeatureType {
 
-    MULTI_MODEL("multi_model", "多模型切换", "在 qwen-plus / qwen-max / qwen-turbo 之间自由切换", true),
-    RAG("rag", "知识库问答", "上传文档构建知识库，基于私有资料精准作答", false),
-    WEB_SEARCH("web_search", "联网搜索", "联网检索最新信息，增强回答时效性", false),
-    MULTIMODAL("multimodal", "文件与图片理解", "上传图片或文档，让模型看懂并分析", false);
+    MULTI_MODEL("multi_model", "多模型切换", "在 qwen-plus / qwen-max / qwen-turbo 等模型间自由切换", true),
+    RAG("rag", "知识库问答", "上传文档构建知识库，基于私有资料精准作答", true),
+    WEB_SEARCH("web_search", "联网搜索", "联网检索最新信息，增强回答时效性", true),
+    MULTIMODAL("multimodal", "图片理解", "上传图片，让模型看懂并分析（使用 qwen-vl 系列模型）", true);
 
     private final String code;
     private final String name;

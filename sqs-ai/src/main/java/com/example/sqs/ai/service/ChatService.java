@@ -2,6 +2,7 @@ package com.example.sqs.ai.service;
 
 import com.example.sqs.ai.config.AgentFactory;
 import com.example.sqs.ai.model.ModelRegistry;
+import com.example.sqs.ai.multimodal.MultimodalService;
 import com.example.sqs.ai.properties.AiProperties;
 import com.example.sqs.ai.rag.RagService;
 import com.example.sqs.common.enums.FeatureType;
@@ -50,6 +51,7 @@ public class ChatService {
     private final ChatMessageService chatMessageService;
     private final ModelRegistry modelRegistry;
     private final AiProperties aiProperties;
+    private final MultimodalService multimodalService;
     private final ObjectProvider<RagService> ragServiceProvider;
 
     /**
@@ -60,16 +62,19 @@ public class ChatService {
             String model = modelRegistry.resolve(request.getModel());
             String content = request.getContent().trim();
             Long sessionId = resolveSession(userId, request, model);
+            boolean multimodal = modelRegistry.isMultimodal(model);
 
-            chatMessageService.save(sessionId, userId, MessageRole.USER, content, model, null);
+            String storedContent = multimodalService.appendImages(content, request.getAttachments());
+            chatMessageService.save(sessionId, userId, MessageRole.USER, storedContent, model, null);
             chatSessionService.updateModel(userId, sessionId, model);
 
-            List<Msg> context = buildContext(userId, sessionId, aiProperties.getHistoryLimit());
-            String systemPrompt = buildSystemPrompt(request, content);
+            List<Msg> context = buildContext(userId, sessionId, aiProperties.getHistoryLimit(), multimodal);
+            String systemPrompt = buildSystemPrompt(userId, request, content);
             log.info("发起对话, userId={}, sessionId={}, model={}, historySize={}",
                     userId, sessionId, model, context.size());
 
-            ReActAgent agent = agentFactory.create(model, systemPrompt);
+            ReActAgent agent = agentFactory.create(model, systemPrompt,
+                    hasFeature(request, FeatureType.WEB_SEARCH));
             StringBuilder answer = new StringBuilder();
             Flux<String> tokenFlux = agent.streamEvents(context)
                     .filter(TextBlockDeltaEvent.class::isInstance)
@@ -97,14 +102,17 @@ public class ChatService {
         String model = modelRegistry.resolve(request.getModel());
         String content = request.getContent().trim();
         Long sessionId = resolveSession(userId, request, model);
+        boolean multimodal = modelRegistry.isMultimodal(model);
 
-        chatMessageService.save(sessionId, userId, MessageRole.USER, content, model, null);
+        String storedContent = multimodalService.appendImages(content, request.getAttachments());
+        chatMessageService.save(sessionId, userId, MessageRole.USER, storedContent, model, null);
         chatSessionService.updateModel(userId, sessionId, model);
 
-        List<Msg> context = buildContext(userId, sessionId, aiProperties.getHistoryLimit());
-        String systemPrompt = buildSystemPrompt(request, content);
+        List<Msg> context = buildContext(userId, sessionId, aiProperties.getHistoryLimit(), multimodal);
+        String systemPrompt = buildSystemPrompt(userId, request, content);
 
-        ReActAgent agent = agentFactory.create(model, systemPrompt);
+        ReActAgent agent = agentFactory.create(model, systemPrompt,
+                hasFeature(request, FeatureType.WEB_SEARCH));
         Msg reply = agent.call(context, RuntimeContext.empty()).block();
 
         String answer = reply == null ? "" : reply.getTextContent();
@@ -126,8 +134,9 @@ public class ChatService {
      *
      * <p>最近一条即本次刚落库的用户提问，随上下文一起传入模型；
      * 历史持久化在库而非进程内存，重启后上下文不丢失。
+     * 用户消息中的图片（Markdown 语法）在多模态模型下解析为 DataBlock。
      */
-    private List<Msg> buildContext(Long userId, Long sessionId, int limit) {
+    private List<Msg> buildContext(Long userId, Long sessionId, int limit, boolean multimodal) {
         List<ChatMessage> records = chatMessageService.recent(userId, sessionId, limit);
         List<Msg> messages = new ArrayList<>(records.size());
         for (ChatMessage record : records) {
@@ -137,8 +146,15 @@ public class ChatService {
             }
             if (MessageRole.ASSISTANT.getValue().equals(record.getRole())) {
                 messages.add(new AssistantMessage(recordContent));
+                continue;
+            }
+            List<String> imageUrls = multimodalService.extractImageUrls(recordContent);
+            String text = multimodalService.stripImages(recordContent);
+            if (multimodal && !imageUrls.isEmpty()) {
+                messages.add(new UserMessage(
+                        multimodalService.buildUserBlocks(text, imageUrls, true)));
             } else {
-                messages.add(new UserMessage(recordContent));
+                messages.add(new UserMessage(text));
             }
         }
         return messages;
@@ -153,11 +169,11 @@ public class ChatService {
         return chatSessionService.create(userId, buildTitle(request.getContent()), model).getId();
     }
 
-    private String buildSystemPrompt(ChatRequest request, String question) {
+    private String buildSystemPrompt(Long userId, ChatRequest request, String question) {
         StringBuilder prompt = new StringBuilder(aiProperties.getSystemPrompt());
         RagService ragService = ragServiceProvider.getIfAvailable();
         if (ragService != null && hasFeature(request, FeatureType.RAG)) {
-            String context = ragService.search(question);
+            String context = ragService.search(userId, question);
             if (StringUtils.hasText(context)) {
                 prompt.append("\n\n请优先参考以下资料作答，资料不足时再用自身知识补充：\n")
                         .append(context);

@@ -21,16 +21,21 @@ export const useChatStore = defineStore('chat', {
     },
     /**
      * 发送消息并流式接收回复。
+     * @param {object} extras 可选项 { features: string[], attachments: string[] }
      */
-    async send(content, model) {
+    async send(content, model, extras = {}) {
       const sessionStore = useSessionStore()
       if (!sessionStore.currentId) {
         await sessionStore.create({ model })
       }
       const sessionId = sessionStore.currentId
 
+      // 乐观渲染：图片以 Markdown 语法拼接（与服务端持久化格式一致）
+      const imageMarkdown = (extras.attachments || [])
+        .map((url) => `\n\n![image](${url})`)
+        .join('')
       this.error = ''
-      this.messages.push({ role: 'user', content })
+      this.messages.push({ role: 'user', content: content + imageMarkdown })
       const reply = { role: 'assistant', content: '', streaming: true, failed: false }
       this.messages.push(reply)
 
@@ -38,7 +43,13 @@ export const useChatStore = defineStore('chat', {
       this.controller = new AbortController()
 
       await streamChat(
-        { sessionId, content, model },
+        {
+          sessionId,
+          content,
+          model,
+          features: extras.features && extras.features.length ? extras.features : undefined,
+          attachments: extras.attachments && extras.attachments.length ? extras.attachments : undefined
+        },
         {
           onDelta: (delta) => {
             reply.content += delta
