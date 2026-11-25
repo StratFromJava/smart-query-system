@@ -10,8 +10,7 @@ buildscript {
 
 ext {
     springBootVersion = '3.4.5'
-    springAiVersion = '1.0.0'
-    springAiAlibabaVersion = '1.0.0.2'
+    agentscopeVersion = '2.0.4'
     mybatisPlusVersion = '3.5.9'
     jjwtVersion = '0.12.6'
     hutoolVersion = '5.8.32'
@@ -50,10 +49,10 @@ subprojects {
     dependencyManagement {
         imports {
             mavenBom "org.springframework.boot:spring-boot-dependencies:${springBootVersion}"
-            mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
-            mavenBom "com.alibaba.cloud.ai:spring-ai-alibaba-bom:${springAiAlibabaVersion}"
         }
         dependencies {
+            dependency "io.agentscope:agentscope-core:${agentscopeVersion}"
+            dependency "io.agentscope:agentscope-extensions-model-dashscope:${agentscopeVersion}"
             dependency "com.baomidou:mybatis-plus-spring-boot3-starter:${mybatisPlusVersion}"
             dependency "cn.hutool:hutool-core:${hutoolVersion}"
             dependency "io.jsonwebtoken:jjwt-api:${jjwtVersion}"

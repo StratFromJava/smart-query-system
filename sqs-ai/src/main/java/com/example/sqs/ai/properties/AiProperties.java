@@ -13,6 +13,9 @@ import java.util.List;
 @ConfigurationProperties(prefix = "sqs.ai")
 public class AiProperties {
 
+    /** DashScope API Key，生产环境通过环境变量 AI_DASHSCOPE_API_KEY 注入。 */
+    private String apiKey = "";
+
     /** 默认模型。 */
     private String defaultModel = "qwen-plus";
 

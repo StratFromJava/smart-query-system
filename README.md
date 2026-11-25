@@ -1,8 +1,8 @@
 # SmartQuery 智能问答系统
 
-基于 **Spring Boot 3 + Spring AI Alibaba（通义千问）** 与 **Vue 3 + Element Plus** 构建的前后端分离智能对话系统。
+基于 **Spring Boot 3 + AgentScope-Java（通义千问）** 与 **Vue 3 + Element Plus** 构建的前后端分离智能对话系统。
 
-参照通义千问的交互体验：SSE 流式打字机输出、Markdown 富文本渲染、会话云端留存与多模型切换；后端采用 Gradle 多模块分层，并通过 Spring Security + JWT 完成用户注册登录与数据隔离；同时为知识库 RAG、联网搜索、文件/图片理解三类扩展能力预留了完整接入点。
+参照通义千问的交互体验：SSE 流式打字机输出、Markdown 富文本渲染、会话云端留存与多模型切换；后端采用 Gradle 多模块分层，并通过 Spring Security + JWT 完成用户注册登录与数据隔离；数据层使用 **SQLite 内嵌本地文件库**（零外部依赖，启动自动建表），同时为知识库 RAG、联网搜索、文件/图片理解三类扩展能力预留了完整接入点。
 
 ---
 
@@ -39,9 +39,9 @@
 | --- | --- |
 | 构建 | Gradle 8.7（Groovy DSL，多模块） |
 | JDK | Java 21（Gradle Toolchain 强制指定） |
-| 后端 | Spring Boot 3.4.5 · Spring AI 1.0.0 · Spring AI Alibaba 1.0.0.2 |
+| 后端 | Spring Boot 3.4.5 · AgentScope-Java 2.0.4（ReActAgent + DashScope 模型扩展） |
 | 鉴权 | Spring Security 6 + JJWT 0.12.6（BCrypt + 无状态 Token） |
-| 数据 | MySQL 8 + MyBatis-Plus 3.5.9（逻辑删除 + 时间自动填充） |
+| 数据 | **SQLite**（org.xerial:sqlite-jdbc 内嵌本地文件库，WAL 模式）+ MyBatis-Plus 3.5.9（逻辑删除 + 时间自动填充） |
 | 前端 | Vue 3.4 + Vite 5 + Element Plus 2.8 + Pinia + Vue Router 4 |
 | 渲染 | markdown-it + highlight.js + DOMPurify + github-markdown-css |
 
@@ -100,13 +100,13 @@ ChatController                   → 取当前 userId，调用 ChatService
    ▼
 ChatService                      ③ 解析/创建会话 → 校验归属
    │                             ④ 落库用户消息
-   │                             ⑤ 加载最近 N 条历史（ConversationHistoryLoader）
+   │                             ⑤ 加载最近 N 条历史（ChatService.buildContext，自 SQLite）
    │                             ⑥ 可选：RAG 检索注入 System Prompt
-   │                             ⑦ ChatClient.stream() → DashScope（通义千问）
-   │                             ⑧ 增量文本 → Flux<String> → SSE 帧
+   │                             ⑦ AgentFactory 构建请求级 ReActAgent → streamEvents() → DashScope（通义千问）
+   │                             ⑧ TextBlockDeltaEvent 增量文本 → Flux<String> → SSE 帧
    │                             ⑨ 流结束后整体落库助手消息 + 自动生成会话标题
    ▼
-MySQL (chat_session / chat_message)
+SQLite (chat_session / chat_message)
 ```
 
 ### 3.3 前端结构
@@ -132,7 +132,7 @@ smart-query-system/
 ├── settings.gradle                 # 声明 5 个子模块
 ├── gradle.properties               # JDK 21 Toolchain、Gradle 内存与并行参数
 ├── sql/
-│   └── schema.sql                  # 建库建表脚本（含预置 admin 账号）
+│   └── schema.sql                  # MySQL 版建表脚本（归档，当前默认不使用）
 │
 ├── sqs-common/                     # 基础层：无业务依赖
 │   └── .../common/
@@ -149,15 +149,14 @@ smart-query-system/
 │       ├── enums/           MessageRole（user / assistant / system）
 │       └── config/          MybatisPlusConfig（逻辑删除、时间自动填充）
 │
-├── sqs-ai/                         # AI 层：对话编排与扩展能力
+├── sqs-ai/                         # AI 层：AgentScope Agent 编排与扩展能力
 │   └── .../ai/
-│       ├── config/          DashScopeConfig        ChatClient Bean
-│       ├── service/         ChatService            流式/非流式对话编排
-│       │                    ConversationHistoryLoader  历史上下文加载
+│       ├── config/          AgentConfig · AgentFactory  全局 Toolkit 与请求级 ReActAgent 工厂
+│       ├── service/         ChatService            流式/非流式对话编排（含历史上下文构建）
 │       ├── model/           ModelRegistry          模型清单与合法性校验
 │       ├── properties/      AiProperties           sqs.ai.* 配置绑定
-│       ├── rag/             VectorStoreConfig · RagService · DocumentIngestService
-│       ├── tool/            WebSearchTool          @Tool 联网搜索
+│       ├── rag/             RagService             知识库检索（占位，待接入向量库）
+│       ├── tool/            WebSearchTool          AgentScope @Tool 联网搜索
 │       └── multimodal/      MultimodalService      多模态接入点
 │
 ├── sqs-security/                   # 安全层：鉴权与账号
@@ -177,7 +176,7 @@ smart-query-system/
 │       ├── controller/     ChatController · SessionController · MetaController
 │       ├── config/         GlobalExceptionHandler · WebMvcConfig（CORS）
 │       ├── dto/            StreamEvent（SSE 帧结构）
-│       └── resources/      application.yml
+│       └── resources/      application.yml · sql/schema-sqlite.sql（启动自动建表）
 │
 └── web/                            # 前端工程（Vite 独立构建，不走 Gradle）
     ├── index.html
@@ -206,7 +205,7 @@ smart-query-system/
 | --- | --- | --- | --- |
 | `sqs-common` | 统一响应 `R`、状态码、业务异常、能力枚举 | `R`、`ResultCode`、`BizException`、`FeatureType` | 无 |
 | `sqs-core` | 数据建模与持久化，所有查询强制带 `userId` | Entity / Mapper / Service / VO | `sqs-common` |
-| `sqs-ai` | 模型调用与对话编排，扩展能力（RAG / 搜索 / 多模态） | `ChatService`、`ModelRegistry` | `sqs-core` |
+| `sqs-ai` | AgentScope Agent 编排与模型调用，扩展能力（RAG / 搜索 / 多模态） | `ChatService`、`AgentFactory`、`ModelRegistry` | `sqs-core` |
 | `sqs-security` | 注册登录、JWT 签发校验、Security 过滤链 | `SecurityUtils.currentUserId()`、`AuthController` | `sqs-core` |
 | `sqs-web` | HTTP 入口、全局异常、CORS、启动类、配置 | REST 接口 | `sqs-ai` + `sqs-security` |
 
@@ -218,11 +217,11 @@ smart-query-system/
 
 | 依赖 | 版本要求 | 备注 |
 | --- | --- | --- |
-| JDK | **21**（必需） | Spring Boot 3 与 Spring AI 均要求 17+；项目已在 `gradle.properties` 指定 Toolchain |
+| JDK | **21**（必需） | Spring Boot 3 与 AgentScope-Java 均要求 17+；项目已在 `gradle.properties` 指定 Toolchain |
 | Gradle | 8.x | 项目不含 wrapper，使用本机 `gradle` 命令即可 |
 | Node.js | 18+ | 推荐 20 / 22 LTS |
-| MySQL | 8.x | 需支持 `utf8mb4` |
 | DashScope API Key | — | 阿里云百炼控制台申请 |
+| ~~MySQL~~ | 无需 | 已切换为 SQLite 内嵌文件库，数据文件默认 `./data/smart-query.db`（目录需存在，首次运行前创建） |
 
 **关于 JDK**：若本机默认 `JAVA_HOME` 是 JDK 8（常见情况），本项目通过 `gradle.properties` 显式指定 Gradle 运行在 JDK 21 上，无需改动系统环境变量：
 
@@ -237,13 +236,16 @@ org.gradle.java.installations.paths=C:/Program Files/Java/jdk-21
 
 ## 七、快速开始
 
-### 步骤 1：初始化数据库
+### 步骤 1：准备数据目录
 
-```bash
-mysql -u root -p < sql/schema.sql
+无需安装数据库。首次运行前创建数据目录（也可通过 `DB_FILE` 环境变量指定其他路径）：
+
+```powershell
+mkdir data   # SQLite 数据文件将生成在 ./data/smart-query.db
 ```
 
-脚本创建 `smart_query` 库及 `sys_user`、`chat_session`、`chat_message` 三张表，并预置账号：
+应用启动时自动执行 `sqs-web/src/main/resources/sql/schema-sqlite.sql`（幂等 DDL），创建
+`sys_user`、`chat_session`、`chat_message` 三张表并预置账号：
 
 | 用户名 | 密码 |
 | --- | --- |
@@ -263,8 +265,7 @@ $env:AI_DASHSCOPE_API_KEY = "sk-xxxxxxxxxxxxxxxx"
 
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
-| `DB_HOST` / `DB_PORT` / `DB_NAME` | 数据库地址 | `localhost` / `3306` / `smart_query` |
-| `DB_USERNAME` / `DB_PASSWORD` | 数据库账号 | `root` / `root` |
+| `DB_FILE` | SQLite 数据文件路径 | `./data/smart-query.db` |
 | `SQS_JWT_SECRET` | JWT 密钥，长度需 ≥ 32 字节 | 开发用默认值（**上线必须覆盖**） |
 
 ### 步骤 3：启动后端
@@ -334,8 +335,10 @@ sqs:
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
 | `server.port` | `8080` | 服务端口 |
-| `spring.ai.dashscope.api-key` | `${AI_DASHSCOPE_API_KEY:}` | DashScope Key |
-| `spring.datasource.hikari.*` | 最大 20 连接 | 连接池 |
+| `sqs.ai.api-key` | `${AI_DASHSCOPE_API_KEY:}` | DashScope Key |
+| `spring.datasource.url` | `jdbc:sqlite:./data/smart-query.db?journal_mode=WAL&busy_timeout=5000` | SQLite 连接（WAL + 忙等待） |
+| `spring.datasource.hikari.maximum-pool-size` | `4` | 连接池（SQLite 单写者，刻意收紧） |
+| `spring.sql.init.mode` | `always` | 启动自动执行 schema-sqlite.sql（幂等） |
 | `mybatis-plus.global-config.db-config.logic-delete-field` | `deleted` | 全局逻辑删除字段 |
 | `management.endpoints.web.exposure.include` | `health,info` | Actuator 暴露端点 |
 
@@ -519,15 +522,15 @@ Token 由 `SecurityUtils.currentUserId()` 解析后注入业务层，所有会�
          top-k: 4
    ```
 
-2. 此时 `VectorStoreConfig` 生效，默认注册 Spring AI 内存实现 `SimpleVectorStore`。  
-   生产环境替换为 Milvus / PGVector / AnalyticDB，只需提供一个新的 `VectorStore` Bean 覆盖即可。
+2. 当前 `RagService` 为占位实现（返回空串）。接入真实检索时，实现向量检索并返回资料片段即可——
+   可选用 AgentScope Knowledge / Milvus / PGVector / AnalyticDB 等。
 
-3. 通过 `DocumentIngestService` 写入文档；请求携带 `features: ["rag"]` 时，`ChatService` 会自动检索并把资料片段拼进 System Prompt。
+3. 请求携带 `features: ["rag"]` 时，`ChatService` 会自动把检索结果拼进 System Prompt（拼装逻辑已就绪）。
 
 ### 联网搜索
 
 1. 开启开关：`sqs.ai.web-search.enabled=true`
-2. `WebSearchTool`（`@Tool` 标注）自动注册为 Bean，在 `ChatService` 中通过 `ChatClient.prompt().tools(webSearchTool)` 挂载即可被模型自主调用。
+2. `WebSearchTool`（AgentScope `@Tool` 标注）自动注册为 Bean，由 `AgentConfig` 挂载到全局 `Toolkit`，即可被模型自主调用。
 3. 替换 `WebSearchTool#search` 的实现接入真实搜索服务（如阿里 IQS、Serper、Bing API）。
 
 ### 文件 / 图片理解
@@ -556,9 +559,9 @@ Spring Boot 3 的 Gradle 插件要求 JDK 17+。项目已在 `gradle.properties`
 $env:JAVA_HOME = 'C:\Program Files\Java\jdk-21'
 ```
 
-**Q2：启动报 `DashScope API key must be set`？**
+**Q2：对话报 `DashScope API key must be set`？**
 
-未注入 `AI_DASHSCOPE_API_KEY`。该 Key 在 DashScope 模型 Bean 初始化时即被校验，属必填项，即使是本地冒烟测试也需填一个占位值。
+未注入 `AI_DASHSCOPE_API_KEY`。该 Key 在首次构建 Agent（发起对话）时校验，属必填项，即使是本地冒烟测试也需填一个占位值。
 
 **Q3：启动报 JWT 密钥长度不足 32 字节？**
 
@@ -577,9 +580,9 @@ $env:JAVA_HOME = 'C:\Program Files\Java\jdk-21'
 
 检查后端日志是否有 Token 解析异常。常见原因是重启后端后 `SQS_JWT_SECRET` 变化，导致旧 Token 失效，清除浏览器 `localStorage` 后重新登录即可。
 
-**Q7：MySQL 连接失败 `Access denied` / 库不存在？**
+**Q7：启动报 `path to './data/smart-query.db' does not exist`？**
 
-确认已执行 `sql/schema.sql`，且 `DB_USERNAME` / `DB_PASSWORD` 与本机一致。
+SQLite 不会自动创建父目录，首次运行前先创建 `data` 目录，或通过 `DB_FILE` 指向已存在的目录。
 
 ---
 

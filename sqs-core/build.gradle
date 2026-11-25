@@ -4,5 +4,5 @@ dependencies {
     api 'com.baomidou:mybatis-plus-spring-boot3-starter'
     api 'org.springframework.boot:spring-boot-starter-validation'
 
-    runtimeOnly 'com.mysql:mysql-connector-j'
+    runtimeOnly 'org.xerial:sqlite-jdbc:3.46.1.3'
 }

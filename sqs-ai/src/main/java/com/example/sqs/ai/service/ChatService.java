@@ -1,33 +1,36 @@
 package com.example.sqs.ai.service;
 
-import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
+import com.example.sqs.ai.config.AgentFactory;
 import com.example.sqs.ai.model.ModelRegistry;
 import com.example.sqs.ai.properties.AiProperties;
 import com.example.sqs.ai.rag.RagService;
 import com.example.sqs.common.enums.FeatureType;
+import com.example.sqs.core.entity.ChatMessage;
 import com.example.sqs.core.enums.MessageRole;
 import com.example.sqs.core.service.ChatMessageService;
 import com.example.sqs.core.service.ChatSessionService;
 import com.example.sqs.core.vo.ChatReplyVO;
 import com.example.sqs.core.vo.ChatRequest;
 import com.example.sqs.core.vo.SessionVO;
+import io.agentscope.core.ReActAgent;
+import io.agentscope.core.agent.RuntimeContext;
+import io.agentscope.core.event.TextBlockDeltaEvent;
+import io.agentscope.core.message.AssistantMessage;
+import io.agentscope.core.message.Msg;
+import io.agentscope.core.message.UserMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 /**
- * 对话编排：会话解析 → 历史上下文 → 可选增强（RAG）→ 模型调用 → 落库。
+ * 对话编排：会话解析 → 历史上下文 → 可选增强（RAG）→ AgentScope Agent 调用 → 落库。
  */
 @Slf4j
 @Service
@@ -42,10 +45,9 @@ public class ChatService {
     private static final String DEFAULT_TITLE = "新对话";
     private static final int TITLE_MAX_LENGTH = 30;
 
-    private final ChatClient chatClient;
+    private final AgentFactory agentFactory;
     private final ChatSessionService chatSessionService;
     private final ChatMessageService chatMessageService;
-    private final ConversationHistoryLoader historyLoader;
     private final ModelRegistry modelRegistry;
     private final AiProperties aiProperties;
     private final ObjectProvider<RagService> ragServiceProvider;
@@ -62,18 +64,16 @@ public class ChatService {
             chatMessageService.save(sessionId, userId, MessageRole.USER, content, model, null);
             chatSessionService.updateModel(userId, sessionId, model);
 
-            List<Message> history = historyLoader.load(userId, sessionId, aiProperties.getHistoryLimit());
+            List<Msg> context = buildContext(userId, sessionId, aiProperties.getHistoryLimit());
             String systemPrompt = buildSystemPrompt(request, content);
-            log.info("发起对话, userId={}, sessionId={}, model={}, historySize={}", userId, sessionId, model, history.size());
+            log.info("发起对话, userId={}, sessionId={}, model={}, historySize={}",
+                    userId, sessionId, model, context.size());
 
+            ReActAgent agent = agentFactory.create(model, systemPrompt);
             StringBuilder answer = new StringBuilder();
-            Flux<String> tokenFlux = chatClient.prompt()
-                    .system(systemPrompt)
-                    .messages(history)
-                    .options(buildOptions(model))
-                    .stream()
-                    .chatResponse()
-                    .map(this::extractText)
+            Flux<String> tokenFlux = agent.streamEvents(context)
+                    .filter(TextBlockDeltaEvent.class::isInstance)
+                    .map(event -> ((TextBlockDeltaEvent) event).getDelta())
                     .filter(StringUtils::hasLength)
                     .doOnNext(answer::append);
 
@@ -101,36 +101,47 @@ public class ChatService {
         chatMessageService.save(sessionId, userId, MessageRole.USER, content, model, null);
         chatSessionService.updateModel(userId, sessionId, model);
 
-        List<Message> history = historyLoader.load(userId, sessionId, aiProperties.getHistoryLimit());
+        List<Msg> context = buildContext(userId, sessionId, aiProperties.getHistoryLimit());
         String systemPrompt = buildSystemPrompt(request, content);
 
-        ChatResponse response = chatClient.prompt()
-                .system(systemPrompt)
-                .messages(history)
-                .options(buildOptions(model))
-                .call()
-                .chatResponse();
+        ReActAgent agent = agentFactory.create(model, systemPrompt);
+        Msg reply = agent.call(context, RuntimeContext.empty()).block();
 
-        String answer = extractText(response);
+        String answer = reply == null ? "" : reply.getTextContent();
         if (!StringUtils.hasText(answer)) {
             answer = "抱歉，模型未返回有效内容，请稍后重试。";
         }
         chatMessageService.save(sessionId, userId, MessageRole.ASSISTANT, answer, model, null);
         applyAutoTitle(userId, sessionId);
 
-        ChatReplyVO reply = new ChatReplyVO();
-        reply.setSessionId(sessionId);
-        reply.setContent(answer);
-        reply.setModel(model);
-        return reply;
+        ChatReplyVO vo = new ChatReplyVO();
+        vo.setSessionId(sessionId);
+        vo.setContent(answer);
+        vo.setModel(model);
+        return vo;
     }
 
-    private DashScopeChatOptions buildOptions(String model) {
-        return DashScopeChatOptions.builder()
-                .withModel(model)
-                .withTemperature(aiProperties.getTemperature())
-                .withIncrementalOutput(true)
-                .build();
+    /**
+     * 从数据库加载会话最近 N 条消息并转为 AgentScope 消息序列。
+     *
+     * <p>最近一条即本次刚落库的用户提问，随上下文一起传入模型；
+     * 历史持久化在库而非进程内存，重启后上下文不丢失。
+     */
+    private List<Msg> buildContext(Long userId, Long sessionId, int limit) {
+        List<ChatMessage> records = chatMessageService.recent(userId, sessionId, limit);
+        List<Msg> messages = new ArrayList<>(records.size());
+        for (ChatMessage record : records) {
+            String recordContent = record.getContent();
+            if (recordContent == null) {
+                continue;
+            }
+            if (MessageRole.ASSISTANT.getValue().equals(record.getRole())) {
+                messages.add(new AssistantMessage(recordContent));
+            } else {
+                messages.add(new UserMessage(recordContent));
+            }
+        }
+        return messages;
     }
 
     private Long resolveSession(Long userId, ChatRequest request, String model) {
@@ -182,18 +193,6 @@ public class ChatService {
         return singleLine.length() <= TITLE_MAX_LENGTH
                 ? singleLine
                 : singleLine.substring(0, TITLE_MAX_LENGTH) + "…";
-    }
-
-    private String extractText(ChatResponse response) {
-        if (response == null) {
-            return "";
-        }
-        Generation generation = response.getResult();
-        if (generation == null) {
-            return "";
-        }
-        AssistantMessage message = generation.getOutput();
-        return message == null || message.getText() == null ? "" : message.getText();
     }
 
     private String safeMessage(Throwable error) {

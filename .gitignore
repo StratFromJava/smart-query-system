@@ -29,6 +29,12 @@ web/.vite/
 *.log
 logs/
 
+# Runtime data（SQLite 内嵌库数据文件）
+data/
+
+# CodeBuddy 工作区数据
+.codebuddy/
+
 # OS
 .DS_Store
 Thumbs.db

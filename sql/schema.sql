@@ -1,6 +1,7 @@
 -- =============================================================================
--- smart-query-system 数据库初始化脚本
--- 执行方式：mysql -u root -p < sql/schema.sql
+-- smart-query-system 数据库初始化脚本（MySQL 版，归档备用）
+-- 当前默认数据层为 SQLite（应用启动自动执行 sqs-web/src/main/resources/sql/schema-sqlite.sql），
+-- 本脚本仅在切换回 MySQL 时使用。执行方式：mysql -u root -p < sql/schema.sql
 -- 说明：默认库名 smart_query，可自行修改；预置账号 admin / admin123
 -- =============================================================================
 

@@ -9,8 +9,7 @@ import java.util.List;
 /**
  * 多模态输入（预留能力）。
  *
- * <p>接入方式：构造带 Media 的 UserMessage，例如
- * {@code new UserMessage(text, List.of(new Media(MimeTypeUtils.IMAGE_PNG, url)))}，
+ * <p>接入方式：构造带 DataBlock（图片等二进制内容）的 UserMessage，
  * 并使用支持视觉的模型（如 qwen-vl-max）。当前仅做占位与校验。
  */
 @Slf4j
